@@ -1,0 +1,11 @@
+{
+  "name": "routeflow",
+  "version": "1.0.0",
+  "description": "RouteFlow - Hyperlocal Route ERP & Subscription Ledger PWA",
+  "scripts": {
+    "start:backend": "cd backend && npm start",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build"
+  }
+}

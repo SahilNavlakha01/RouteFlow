@@ -1,0 +1,20 @@
+{
+  "name": "routeflow-backend",
+  "version": "1.0.0",
+  "description": "RouteFlow Micro-ERP & Route Ledger Backend API",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.2.14",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.3"
+  }
+}
