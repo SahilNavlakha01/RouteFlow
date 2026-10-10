@@ -58,17 +58,12 @@ export default function DashboardPage() {
     );
   }
 
-  if (!user) {
-    return <AuthView />;
-  }
+  if (!user) return null;
 
   const currency = user.currency || '₹';
 
   return (
-    <div className="min-h-screen bg-stone-950 pb-24 md:pb-12 text-stone-100">
-      <Navbar />
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 space-y-6">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 sm:pt-7 space-y-6">
         
         {/* Welcome Banner & Route Launcher */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-500/15 via-stone-900 to-stone-900 border border-amber-500/25 p-6 sm:p-8">
@@ -221,41 +216,79 @@ export default function DashboardPage() {
                     delivered: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
                   };
 
+                  const itemsCount = parseFloat(entry.total_items) || 0;
+                  const formattedDate = entry.entry_date ? new Date(entry.entry_date).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                  }) : '';
+
                   return (
-                    <div
+                    <Link
                       key={entry.id}
-                      className="py-3.5 flex items-center justify-between gap-4 hover:bg-stone-900/30 rounded-xl px-2 transition-colors"
+                      href="/route"
+                      className="py-3 flex items-center justify-between gap-3 hover:bg-stone-900/40 rounded-xl px-2 transition-all group"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="shrink-0 min-w-[52px] px-2 h-10 rounded-xl bg-stone-900 border border-stone-800 flex items-center justify-center font-bold text-xs text-amber-400 whitespace-nowrap">
+                        {/* High contrast golden unit badge */}
+                        <div className="shrink-0 min-w-[50px] sm:min-w-[56px] px-2 h-10 sm:h-11 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center font-black text-xs sm:text-sm whitespace-nowrap shadow-sm shadow-amber-500/20">
                           {entry.unit_number || 'Flat'}
                         </div>
-                        <div>
-                          <div className="text-sm font-semibold text-white flex items-center gap-2">
-                            {entry.customer_name}
-                            <span className="text-[11px] text-stone-400 font-normal">
-                              {entry.society_name} {entry.block_name ? `• ${entry.block_name}` : ''}
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors truncate">
+                              {entry.customer_name}
                             </span>
+                            {entry.society_name ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-amber-400/90 font-medium">
+                                <Building className="w-3 h-3 shrink-0" />
+                                {entry.society_name}
+                                {entry.block_name ? ` • ${entry.block_name}` : ''}
+                              </span>
+                            ) : null}
                           </div>
-                          <div className="text-xs text-stone-400 mt-0.5">
-                            {entry.total_items} items • {entry.notes || 'Routine pickup'}
+
+                          <div className="flex items-center gap-2 text-xs text-stone-400 mt-0.5">
+                            <span className="font-medium text-stone-300">
+                              {itemsCount} {itemsCount === 1 ? 'item' : 'items'}
+                            </span>
+                            {formattedDate && (
+                              <>
+                                <span className="text-stone-600">•</span>
+                                <span className="inline-flex items-center gap-1 text-stone-400">
+                                  <Calendar className="w-3 h-3 text-stone-500" />
+                                  {formattedDate}
+                                </span>
+                              </>
+                            )}
+                            {entry.notes && (
+                              <>
+                                <span className="text-stone-600">•</span>
+                                <span className="truncate max-w-[140px] text-stone-500 italic">
+                                  {entry.notes}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-white">
-                          {currency}{parseFloat(entry.total_amount).toFixed(0)}
+                      <div className="text-right shrink-0 flex items-center gap-2.5">
+                        <div>
+                          <div className="text-sm font-extrabold text-white">
+                            {currency}{parseFloat(entry.total_amount).toFixed(0)}
+                          </div>
+                          <span
+                            className={`inline-block mt-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                              statusColors[entry.status] || 'bg-stone-800 text-stone-300 border-stone-700'
+                            }`}
+                          >
+                            {entry.status}
+                          </span>
                         </div>
-                        <span
-                          className={`inline-block mt-1 text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border ${
-                            statusColors[entry.status] || 'bg-stone-800 text-stone-300 border-stone-700'
-                          }`}
-                        >
-                          {entry.status}
-                        </span>
+                        <ArrowRight className="w-4 h-4 text-stone-600 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -344,8 +377,5 @@ export default function DashboardPage() {
         </div>
 
       </main>
-
-      <BottomNav />
-    </div>
   );
 }

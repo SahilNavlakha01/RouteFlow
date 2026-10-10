@@ -14,16 +14,16 @@ export default function LanguageSwitcher() {
   ];
 
   return (
-    <div className="flex items-center gap-1 p-1 rounded-xl bg-stone-900 border border-stone-800">
-      <Globe className="w-3.5 h-3.5 text-stone-400 ml-1.5 hidden sm:inline" />
+    <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-xl bg-stone-900 border border-stone-800 shrink-0">
+      <Globe className="w-3.5 h-3.5 text-stone-400 ml-1.5 hidden md:inline" />
       {options.map((opt) => (
         <button
           key={opt.code}
           type="button"
           onClick={() => setLanguage(opt.code)}
-          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+          className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${
             language === opt.code
-              ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
+              ? 'bg-amber-400 text-stone-950 font-bold shadow-sm'
               : 'text-stone-400 hover:text-white'
           }`}
         >

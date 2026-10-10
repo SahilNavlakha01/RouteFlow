@@ -15,6 +15,8 @@ interface DatePickerProps {
   minDate?: string;
   maxDate?: string;
   disabled?: boolean;
+  showRawDate?: boolean;
+  compact?: boolean;
 }
 
 const MONTH_NAMES_EN = [
@@ -47,6 +49,8 @@ export default function DatePicker({
   minDate,
   maxDate,
   disabled = false,
+  showRawDate = false,
+  compact = false,
 }: DatePickerProps) {
   const { language, t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -188,18 +192,29 @@ export default function DatePicker({
     const day = selectedDate.getDate();
     const month = monthNames[selectedDate.getMonth()].slice(0, 3);
     const year = selectedDate.getFullYear();
+    const isCurrentYear = year === today.getFullYear();
 
-    // Check if it's today or yesterday
     const isToday =
       selectedDate.getFullYear() === today.getFullYear() &&
       selectedDate.getMonth() === today.getMonth() &&
       selectedDate.getDate() === today.getDate();
 
     if (isToday) {
-      return `${t('today')} (${day} ${month})`;
+      return compact ? `${day} ${month}` : `${t('today')} (${day} ${month})`;
     }
 
-    return `${day} ${month} ${year}`;
+    const yest = new Date();
+    yest.setDate(today.getDate() - 1);
+    const isYesterday =
+      selectedDate.getFullYear() === yest.getFullYear() &&
+      selectedDate.getMonth() === yest.getMonth() &&
+      selectedDate.getDate() === yest.getDate();
+
+    if (isYesterday && !compact) {
+      return `${t('yesterday')} (${day} ${month})`;
+    }
+
+    return isCurrentYear ? `${day} ${month}` : `${day} ${month} ${year}`;
   };
 
   // Available years for fast selector
@@ -219,19 +234,21 @@ export default function DatePicker({
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-stone-900 border text-left transition-all text-xs ${
+        className={`w-full flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl bg-stone-900 border text-left transition-all text-xs ${
           isOpen
             ? 'border-amber-400 ring-2 ring-amber-400/20 text-white'
             : 'border-stone-800 text-stone-200 hover:border-stone-700 hover:bg-stone-850'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <CalendarIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-          <span className="font-medium truncate">{getDisplayValue()}</span>
+          <span className="font-semibold truncate">{getDisplayValue()}</span>
         </div>
-        <span className="text-[10px] text-stone-500 font-mono shrink-0">
-          {value || 'YYYY-MM-DD'}
-        </span>
+        {showRawDate && (
+          <span className="text-[10px] text-stone-500 font-mono shrink-0">
+            {value || 'YYYY-MM-DD'}
+          </span>
+        )}
       </button>
 
       {/* Dropdown Popover */}

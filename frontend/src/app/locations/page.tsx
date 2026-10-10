@@ -112,12 +112,10 @@ export default function LocationsPage() {
   };
 
   if (authLoading) return null;
-  if (!user) return <AuthView />;
+  if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-stone-950 pb-24 md:pb-12 text-stone-100">
-      <Navbar />
-
+    <>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 space-y-5">
         
         {/* Header */}
@@ -335,8 +333,6 @@ export default function LocationsPage() {
           </div>
         </div>
       )}
-
-      <BottomNav />
-    </div>
+    </>
   );
 }

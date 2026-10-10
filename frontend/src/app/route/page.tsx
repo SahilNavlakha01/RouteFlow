@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import AuthView from '@/components/AuthView';
@@ -29,7 +30,7 @@ import {
 export default function RouteEntryPage() {
   const { user, loading: authLoading } = useAuth();
   const { t } = useLanguage();
-  
+
   // Date & Filter states
   const [selectedDate, setSelectedDate] = useState('');
   const [societies, setSocieties] = useState<any[]>([]);
@@ -39,7 +40,7 @@ export default function RouteEntryPage() {
   useEffect(() => {
     setSelectedDate(new Date().toISOString().split('T')[0]);
   }, []);
-  
+
   // Core data states
   const [customers, setCustomers] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
@@ -48,6 +49,8 @@ export default function RouteEntryPage() {
 
   // Active Entry Modal State
   const [activeCustomer, setActiveCustomer] = useState<any | null>(null);
+  const [modalEntryDate, setModalEntryDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [loadingEntryForDate, setLoadingEntryForDate] = useState(false);
   const [itemQuantities, setItemQuantities] = useState<Record<number, number>>({});
   const [entryStatus, setEntryStatus] = useState<string>('collected');
   const [entryNotes, setEntryNotes] = useState<string>('');
@@ -120,13 +123,8 @@ export default function RouteEntryPage() {
   const currentSociety = societies.find((s) => String(s.id) === String(selectedSocietyId));
   const availableBlocks = currentSociety ? currentSociety.blocks || [] : [];
 
-  // Open entry modal for customer
-  const handleOpenEntry = (cust: any) => {
-    setActiveCustomer(cust);
-    setSaveSuccess(false);
-
-    // Check if entry already exists for this customer today
-    const existing = dailyEntries.find((e) => Number(e.customer_id) === Number(cust.id));
+  // Helper to populate or reset modal state from entry object
+  const applyEntryData = (existing: any | null) => {
     if (existing && existing.items) {
       const qtyMap: Record<number, number> = {};
       for (const it of existing.items) {
@@ -143,6 +141,41 @@ export default function RouteEntryPage() {
       setEntryStatus('collected');
       setEntryNotes('');
       setInstantPaid('');
+    }
+  };
+
+  // Open entry modal for customer (defaults to selectedDate or today)
+  const handleOpenEntry = (cust: any) => {
+    setActiveCustomer(cust);
+    setSaveSuccess(false);
+    const targetDate = selectedDate || new Date().toISOString().split('T')[0];
+    setModalEntryDate(targetDate);
+
+    // If target date is same as page date, use already loaded dailyEntries
+    const existing = dailyEntries.find((e) => Number(e.customer_id) === Number(cust.id));
+    applyEntryData(existing);
+  };
+
+  // Change date inside the entry modal (allows logging past date entries)
+  const handleModalDateChange = async (newDate: string) => {
+    setModalEntryDate(newDate);
+    if (!activeCustomer) return;
+
+    if (newDate === selectedDate) {
+      const existing = dailyEntries.find((e) => Number(e.customer_id) === Number(activeCustomer.id));
+      applyEntryData(existing);
+    } else {
+      setLoadingEntryForDate(true);
+      try {
+        const res = await api.getDailyEntries({ customer_id: activeCustomer.id, date: newDate });
+        const existing = res?.entries && res.entries.length > 0 ? res.entries[0] : null;
+        applyEntryData(existing);
+      } catch (err) {
+        console.error('Error fetching entry for date:', err);
+        applyEntryData(null);
+      } finally {
+        setLoadingEntryForDate(false);
+      }
     }
   };
 
@@ -202,7 +235,7 @@ export default function RouteEntryPage() {
 
       await api.createDailyEntry({
         customer_id: activeCustomer.id,
-        entry_date: selectedDate,
+        entry_date: modalEntryDate,
         items: itemsPayload,
         status: entryStatus,
         payment_status: instantPaid && parseFloat(instantPaid) > 0 ? 'paid' : 'unpaid',
@@ -258,11 +291,9 @@ export default function RouteEntryPage() {
   ).length;
 
   return (
-    <div className="min-h-screen bg-stone-950 pb-24 md:pb-12 text-stone-100">
-      <Navbar />
-
+    <>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 space-y-5">
-        
+
         {/* Top Route Action Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -305,45 +336,64 @@ export default function RouteEntryPage() {
 
         {/* Route Filter Navigation Chips (Societies & Blocks) */}
         <div className="glass-panel rounded-2xl p-4 border border-stone-800 space-y-3">
-          
+
           {/* Society Selector Pills */}
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-2 flex items-center gap-1.5">
-              <Building className="w-3.5 h-3.5 text-amber-400" />
-              <span>{t('selectSociety')}</span>
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-              <button
-                onClick={() => {
-                  setSelectedSocietyId('all');
-                  setSelectedBlockId('all');
-                }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                  selectedSocietyId === 'all'
-                    ? 'bg-amber-500 text-stone-950 font-bold shadow-md shadow-amber-500/20'
-                    : 'bg-stone-900/90 text-stone-400 hover:text-white border border-stone-800'
-                }`}
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-stone-400 flex items-center gap-1.5">
+                <Building className="w-3.5 h-3.5 text-amber-400" />
+                <span>{t('selectSociety')}</span>
+              </div>
+              <Link
+                href="/locations"
+                className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1"
               >
-                {t('allSocieties')} ({societies.length})
-              </button>
+                + Manage Societies & Wings
+              </Link>
+            </div>
 
-              {societies.map((soc) => (
+            {societies.length === 0 ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-300">
+                <span>No Societies added yet. Add your apartment complexes/societies to filter by Wings!</span>
+                <Link
+                  href="/locations"
+                  className="px-3 py-1 rounded-lg bg-amber-400 text-stone-950 font-bold hover:bg-amber-300 text-center self-start sm:self-auto"
+                >
+                  + Add Society
+                </Link>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
                 <button
-                  key={soc.id}
                   onClick={() => {
-                    setSelectedSocietyId(String(soc.id));
+                    setSelectedSocietyId('all');
                     setSelectedBlockId('all');
                   }}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                    String(selectedSocietyId) === String(soc.id)
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${selectedSocietyId === 'all'
                       ? 'bg-amber-500 text-stone-950 font-bold shadow-md shadow-amber-500/20'
                       : 'bg-stone-900/90 text-stone-400 hover:text-white border border-stone-800'
-                  }`}
+                    }`}
                 >
-                  {soc.name}
+                  {t('allSocieties')} ({societies.length})
                 </button>
-              ))}
-            </div>
+
+                {societies.map((soc) => (
+                  <button
+                    key={soc.id}
+                    onClick={() => {
+                      setSelectedSocietyId(String(soc.id));
+                      setSelectedBlockId('all');
+                    }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${String(selectedSocietyId) === String(soc.id)
+                        ? 'bg-amber-500 text-stone-950 font-bold shadow-md shadow-amber-500/20'
+                        : 'bg-stone-900/90 text-stone-400 hover:text-white border border-stone-800'
+                      }`}
+                  >
+                    {soc.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Block / Wing Selector Pills (if society selected) */}
@@ -355,11 +405,10 @@ export default function RouteEntryPage() {
               <div className="flex items-center gap-2 overflow-x-auto pb-1">
                 <button
                   onClick={() => setSelectedBlockId('all')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                    selectedBlockId === 'all'
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${selectedBlockId === 'all'
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                       : 'bg-stone-900 text-stone-400 border border-stone-800'
-                  }`}
+                    }`}
                 >
                   All Wings
                 </button>
@@ -367,11 +416,10 @@ export default function RouteEntryPage() {
                   <button
                     key={b.id}
                     onClick={() => setSelectedBlockId(String(b.id))}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                      String(selectedBlockId) === String(b.id)
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${String(selectedBlockId) === String(b.id)
                         ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                         : 'bg-stone-900 text-stone-400 border border-stone-800'
-                    }`}
+                      }`}
                   >
                     {b.name}
                   </button>
@@ -426,22 +474,20 @@ export default function RouteEntryPage() {
                 <div
                   key={cust.id}
                   onClick={() => handleOpenEntry(cust)}
-                  className={`rounded-2xl p-4 border transition-all cursor-pointer relative overflow-hidden group active:scale-[0.98] ${
-                    isRecorded
+                  className={`rounded-2xl p-4 border transition-all cursor-pointer relative overflow-hidden group active:scale-[0.98] ${isRecorded
                       ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/50'
                       : 'bg-stone-900/60 border-stone-800/80 hover:border-stone-700 hover:bg-stone-900'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    
+
                     {/* Flat Badge */}
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div
-                        className={`shrink-0 min-w-[56px] px-2.5 h-12 rounded-2xl flex items-center justify-center font-black text-xs sm:text-sm whitespace-nowrap transition-colors ${
-                          isRecorded
-                            ? 'bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20'
+                        className={`shrink-0 min-w-[56px] px-2.5 h-12 rounded-2xl flex items-center justify-center font-black text-xs sm:text-sm whitespace-nowrap transition-colors shadow-sm ${isRecorded
+                            ? 'bg-amber-400 text-stone-950 ring-2 ring-amber-400/30'
                             : 'bg-stone-800 text-stone-200 group-hover:bg-amber-500/20 group-hover:text-amber-300'
-                        }`}
+                          }`}
                       >
                         {cust.unit_number}
                       </div>
@@ -450,20 +496,28 @@ export default function RouteEntryPage() {
                         <h3 className="font-bold text-sm text-white truncate">
                           {cust.name}
                         </h3>
-                        <div className="text-xs text-stone-400 mt-0.5 truncate">
-                          {cust.society_name} {cust.block_name ? `• ${cust.block_name}` : ''}
-                        </div>
+                        {cust.society_name ? (
+                          <div className="text-xs text-stone-400 mt-1 truncate flex items-center gap-1.5">
+                            <Building className="w-3.5 h-3.5 text-amber-400/80 shrink-0" />
+                            <span>{cust.society_name} {cust.block_name ? `• ${cust.block_name}` : ''}</span>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-stone-500 mt-1 italic flex items-center gap-1">
+                            <Building className="w-3.5 h-3.5 text-stone-600 shrink-0" />
+                            <span>No society assigned</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Pending Dues Chip */}
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       {parseFloat(cust.current_balance) > 0 ? (
-                        <span className="text-[11px] font-semibold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
+                        <span className="text-[11px] font-semibold text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/20 whitespace-nowrap inline-block">
                           {t('due')}: {currency}{cust.current_balance}
                         </span>
                       ) : (
-                        <span className="text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        <span className="text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 whitespace-nowrap inline-block">
                           {t('clear')}
                         </span>
                       )}
@@ -473,23 +527,23 @@ export default function RouteEntryPage() {
                   {/* Recorded Order Details or Quick Prompt */}
                   <div className="mt-3 pt-3 border-t border-stone-800/60 flex items-center justify-between text-xs">
                     {isRecorded ? (
-                      <div className="flex items-center gap-2 text-amber-300 font-semibold">
-                        <CheckCircle2 className="w-4 h-4 text-amber-400" />
-                        <span>
+                      <div className="flex items-center gap-2 text-amber-300 font-semibold min-w-0 flex-1">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="truncate">
                           {existingEntry.total_items} items • {currency}{parseFloat(existingEntry.total_amount).toFixed(0)}
                         </span>
-                        <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">
                           {t(existingEntry.status) || existingEntry.status}
                         </span>
                       </div>
                     ) : (
-                      <div className="text-stone-400 flex items-center gap-1 group-hover:text-stone-200">
+                      <div className="text-stone-400 flex items-center gap-1.5 group-hover:text-amber-400 transition-colors">
                         <Plus className="w-3.5 h-3.5 text-amber-400" />
-                        <span>{t('tapToRecord')}</span>
+                        <span className="font-semibold">{t('tapToRecord')}</span>
                       </div>
                     )}
 
-                    <div className="text-stone-500 group-hover:text-amber-400 transition-colors">
+                    <div className="text-stone-500 group-hover:text-amber-400 transition-colors shrink-0 ml-2">
                       <ArrowRight className="w-4 h-4" />
                     </div>
                   </div>
@@ -505,7 +559,7 @@ export default function RouteEntryPage() {
       {activeCustomer && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-950/80 backdrop-blur-md">
           <div className="w-full sm:max-w-lg bg-stone-900 border border-stone-800 rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5">
-            
+
             {/* Header */}
             <div className="p-4 sm:p-5 border-b border-stone-800/80 flex items-center justify-between bg-stone-900/90">
               <div className="flex items-center gap-3">
@@ -515,7 +569,7 @@ export default function RouteEntryPage() {
                 <div>
                   <h2 className="text-base font-bold text-white">{activeCustomer.name}</h2>
                   <div className="text-xs text-stone-400">
-                    {activeCustomer.society_name} • {activeCustomer.phone || 'No phone'}
+                    {activeCustomer.society_name ? `${activeCustomer.society_name} • ` : ''}{activeCustomer.phone || 'No phone'}
                   </div>
                 </div>
               </div>
@@ -526,6 +580,76 @@ export default function RouteEntryPage() {
               >
                 <X className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Dedicated Entry Date Section (Fixed layout, no truncation) */}
+            <div className="px-4 py-3 sm:px-5 bg-stone-950/90 border-b border-stone-800/80 space-y-2.5">
+              {/* Row 1: Label + Prominent Formatted Date + Past Date Indicator */}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="text-xs font-semibold text-stone-400">Entry Date:</span>
+                  <span className="text-xs font-extrabold text-amber-400">
+                    {new Date(modalEntryDate + 'T00:00:00').toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </span>
+                  {modalEntryDate !== new Date().toISOString().split('T')[0] && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/25">
+                      Past Date
+                    </span>
+                  )}
+                </div>
+
+                {loadingEntryForDate && (
+                  <div className="flex items-center gap-1.5 text-[11px] text-amber-400 font-medium">
+                    <div className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin" />
+                    <span>Loading items...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Row 2: Equal 3-Button Selector (Today | Yesterday | Calendar) */}
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleModalDateChange(new Date().toISOString().split('T')[0])}
+                  className={`py-2 px-2 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center ${modalEntryDate === new Date().toISOString().split('T')[0]
+                      ? 'bg-amber-400 text-stone-950 shadow-md shadow-amber-400/20'
+                      : 'bg-stone-900 text-stone-300 hover:text-white hover:bg-stone-850 border border-stone-800'
+                    }`}
+                >
+                  {t('today')}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const yest = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+                    handleModalDateChange(yest);
+                  }}
+                  className={`py-2 px-2 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center ${modalEntryDate === new Date(Date.now() - 86400000).toISOString().split('T')[0]
+                      ? 'bg-amber-400 text-stone-950 shadow-md shadow-amber-400/20'
+                      : 'bg-stone-900 text-stone-300 hover:text-white hover:bg-stone-850 border border-stone-800'
+                    }`}
+                >
+                  {t('yesterday')}
+                </button>
+
+                <div className="w-full">
+                  <DatePicker
+                    value={modalEntryDate}
+                    onChange={(val) => handleModalDateChange(val)}
+                    align="right"
+                    placeholder="Custom"
+                    compact={true}
+                    showRawDate={false}
+                    className="w-full"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Scrollable Services Items Picker */}
@@ -546,11 +670,10 @@ export default function RouteEntryPage() {
                   return (
                     <div
                       key={service.id}
-                      className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
-                        qty > 0
+                      className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${qty > 0
                           ? 'bg-amber-500/10 border-amber-500/30'
                           : 'bg-stone-950/50 border-stone-800/80'
-                      }`}
+                        }`}
                     >
                       <div>
                         <div className="text-sm font-semibold text-white flex items-center gap-2">
@@ -658,11 +781,10 @@ export default function RouteEntryPage() {
                 type="button"
                 onClick={handleSaveEntry}
                 disabled={saving || modalTotalItems === 0}
-                className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 ${
-                  saveSuccess
+                className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 ${saveSuccess
                     ? 'bg-emerald-500 text-stone-950'
                     : 'bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-50'
-                }`}
+                  }`}
               >
                 {saving ? (
                   <span className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
@@ -772,8 +894,6 @@ export default function RouteEntryPage() {
           </div>
         </div>
       )}
-
-      <BottomNav />
-    </div>
+    </>
   );
 }

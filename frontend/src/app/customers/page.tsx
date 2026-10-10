@@ -23,6 +23,8 @@ import {
   X,
   Calendar,
   CheckCircle2,
+  ArrowDownLeft,
+  Receipt,
 } from 'lucide-react';
 
 export default function CustomersPage() {
@@ -38,6 +40,7 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [ledgerData, setLedgerData] = useState<any | null>(null);
   const [loadingLedger, setLoadingLedger] = useState(false);
+  const [historyTab, setHistoryTab] = useState<'all' | 'entries' | 'payments'>('all');
 
   // Add / Edit Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -191,17 +194,61 @@ export default function CustomersPage() {
     }
   };
 
+  // Combined and sorted chronological history (Deliveries + Payments)
+  const combinedHistory = React.useMemo(() => {
+    if (!ledgerData) return [];
+    const list: any[] = [];
+
+    if (historyTab === 'all' || historyTab === 'entries') {
+      (ledgerData.entries || []).forEach((e: any) => {
+        list.push({
+          type: 'entry',
+          id: `entry-${e.id}`,
+          rawId: e.id,
+          date: e.entry_date,
+          total: parseFloat(e.total_amount) || 0,
+          status: e.status,
+          payment_status: e.payment_status,
+          paid_amount: parseFloat(e.paid_amount) || 0,
+          items: e.items || [],
+          notes: e.notes,
+          created_at: e.created_at,
+        });
+      });
+    }
+
+    if (historyTab === 'all' || historyTab === 'payments') {
+      (ledgerData.payments || []).forEach((p: any) => {
+        list.push({
+          type: 'payment',
+          id: `payment-${p.id}`,
+          rawId: p.id,
+          date: p.payment_date,
+          amount: parseFloat(p.amount) || 0,
+          mode: p.payment_mode || 'cash',
+          notes: p.notes,
+          created_at: p.created_at,
+        });
+      });
+    }
+
+    return list.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+      return (b.rawId || 0) - (a.rawId || 0);
+    });
+  }, [ledgerData, historyTab]);
+
   if (authLoading) return null;
-  if (!user) return <AuthView />;
+  if (!user) return null;
 
   const currency = user.currency || '₹';
   const selectedSocObj = societies.find((s) => String(s.id) === String(formSocietyId));
   const modalBlocks = selectedSocObj ? selectedSocObj.blocks || [] : [];
 
   return (
-    <div className="min-h-screen bg-stone-950 pb-24 md:pb-12 text-stone-100">
-      <Navbar />
-
+    <>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 space-y-5">
         
         {/* Header */}
@@ -216,14 +263,40 @@ export default function CustomersPage() {
             </p>
           </div>
 
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t('addResident')}</span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/locations"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-200 border border-stone-800 font-semibold text-xs transition-colors shadow-sm"
+            >
+              <Building className="w-4 h-4 text-amber-400" />
+              <span>{t('navSocieties')} & Wings ({societies.length})</span>
+            </Link>
+
+            <button
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{t('addResident')}</span>
+            </button>
+          </div>
         </div>
+
+        {/* Notice when 0 Societies exist */}
+        {societies.length === 0 && (
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5 text-amber-300">
+              <Building className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>No Societies or Wings added yet. Add your apartment complexes/wings to link your flats!</span>
+            </div>
+            <Link
+              href="/locations"
+              className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold shrink-0 text-xs transition-colors self-start sm:self-auto"
+            >
+              + Add Society & Wings
+            </Link>
+          </div>
+        )}
 
         {/* Filter & Search Bar */}
         <div className="glass-panel rounded-2xl p-3 sm:p-4 border border-stone-800 flex flex-col sm:flex-row gap-3">
@@ -295,9 +368,24 @@ export default function CustomersPage() {
                             </a>
                           )}
                         </div>
-                        <div className="text-xs text-stone-400 mt-0.5 truncate">
-                          {cust.society_name} {cust.block_name ? `• ${cust.block_name}` : ''}
-                        </div>
+                        {cust.society_name ? (
+                          <div className="text-xs text-stone-400 mt-1 truncate flex items-center gap-1.5">
+                            <Building className="w-3.5 h-3.5 text-amber-400/80 shrink-0" />
+                            <span>{cust.society_name} {cust.block_name ? `• ${cust.block_name}` : ''}</span>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-stone-500 mt-1 italic flex items-center gap-1.5">
+                            <Building className="w-3.5 h-3.5 text-stone-600 shrink-0" />
+                            <span>No society assigned</span>
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(cust)}
+                              className="text-amber-400 hover:underline not-italic font-semibold text-[11px] ml-1"
+                            >
+                              + Assign
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -401,85 +489,191 @@ export default function CustomersPage() {
               </div>
             )}
 
-            {/* Chronological Ledger List */}
-            <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-stone-400">
-                  Transaction & Route History
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPaymentModalOpen(true)}
-                    className="px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1"
-                  >
-                    <CreditCard className="w-3.5 h-3.5" />
-                    <span>{t('recordPayment')}</span>
-                  </button>
+            {/* Quick Action Buttons (Evenly Aligned 2-Column Grid) */}
+            <div className="grid grid-cols-2 gap-3 p-4 sm:p-5 pb-0">
+              <button
+                type="button"
+                onClick={() => setPaymentModalOpen(true)}
+                className="h-11 px-3 sm:px-4 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
+              >
+                <CreditCard className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="truncate">{t('recordPayment')}</span>
+              </button>
 
-                  <Link
-                    href={`/invoices?customer_id=${selectedCustomer.id}`}
-                    className="px-3 py-1 rounded-lg bg-amber-500 text-stone-950 text-xs font-bold flex items-center gap-1"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>{t('billPdf')}</span>
-                  </Link>
-                </div>
+              <Link
+                href={`/invoices?customer_id=${selectedCustomer.id}`}
+                className="h-11 px-3 sm:px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 text-xs font-black flex items-center justify-center gap-2 transition-all shadow-sm shadow-amber-400/20 active:scale-95"
+              >
+                <FileText className="w-4 h-4 text-stone-950 shrink-0" />
+                <span className="truncate">{t('billPdf')}</span>
+              </Link>
+            </div>
+
+            {/* History Header & Category Tabs */}
+            <div className="px-4 sm:px-5 pt-4 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-stone-400">
+                Transaction & Route History
+              </span>
+
+              {/* Tabs: All | Deliveries | Payments */}
+              <div className="inline-flex items-center gap-1 bg-stone-950/80 p-1 rounded-xl border border-stone-800 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab('all')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    historyTab === 'all'
+                      ? 'bg-amber-400 text-stone-950 shadow-sm'
+                      : 'text-stone-400 hover:text-white'
+                  }`}
+                >
+                  All ({((ledgerData?.entries?.length || 0) + (ledgerData?.payments?.length || 0))})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab('entries')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    historyTab === 'entries'
+                      ? 'bg-amber-400 text-stone-950 shadow-sm'
+                      : 'text-stone-400 hover:text-white'
+                  }`}
+                >
+                  Deliveries ({ledgerData?.entries?.length || 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab('payments')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    historyTab === 'payments'
+                      ? 'bg-emerald-400 text-stone-950 shadow-sm'
+                      : 'text-stone-400 hover:text-emerald-400'
+                  }`}
+                >
+                  Payments ({ledgerData?.payments?.length || 0})
+                </button>
               </div>
+            </div>
 
+            {/* Chronological Ledger List */}
+            <div className="px-4 sm:px-5 pb-5 overflow-y-auto flex-1 space-y-2.5">
               {loadingLedger ? (
                 <div className="py-12 flex justify-center">
                   <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
                 </div>
-              ) : !ledgerData?.entries || ledgerData.entries.length === 0 ? (
-                <div className="text-center py-8 text-stone-500 text-xs">
-                  No pickup entries recorded yet for this customer.
+              ) : combinedHistory.length === 0 ? (
+                <div className="text-center py-10 text-stone-500 text-xs">
+                  {historyTab === 'payments'
+                    ? "No payments recorded yet for this customer. Tap '+ Record Payment' above."
+                    : historyTab === 'entries'
+                    ? 'No pickup/delivery entries recorded yet for this customer.'
+                    : 'No transaction or delivery history recorded yet.'}
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  {ledgerData.entries.map((entry: any) => (
-                    <div
-                      key={entry.id}
-                      className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800/80 flex items-start justify-between gap-3"
-                    >
-                      <div>
-                        <div className="text-xs font-semibold text-white flex items-center gap-2">
-                          <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                          <span>{entry.entry_date?.substring(0, 10)}</span>
-                          <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25">
-                            {entry.status}
+                  {combinedHistory.map((item: any) => {
+                    if (item.type === 'payment') {
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-3.5 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 flex items-start justify-between gap-3 shadow-sm hover:border-emerald-500/50 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                                <ArrowDownLeft className="w-3.5 h-3.5" />
+                              </div>
+                              <span className="text-xs font-bold text-white">
+                                {item.date?.substring(0, 10)}
+                              </span>
+                              <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                Payment Received
+                              </span>
+                              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-stone-900 text-stone-400 border border-stone-800">
+                                {item.mode}
+                              </span>
+                            </div>
+
+                            <div className="text-xs text-stone-300 mt-1.5 flex items-center gap-2 flex-wrap">
+                              <span className="text-emerald-400 font-semibold">Payment collected from customer</span>
+                              {item.notes && (
+                                <>
+                                  <span className="text-stone-600">•</span>
+                                  <span className="text-stone-400 italic truncate max-w-[220px]">
+                                    {item.notes}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <div className="text-sm sm:text-base font-black text-emerald-400">
+                              +{currency}{item.amount.toFixed(0)}
+                            </div>
+                            <span className="text-[10px] text-emerald-500/80 font-bold uppercase tracking-wider block mt-0.5">
+                              Received
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // type === 'entry'
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-3.5 rounded-2xl bg-stone-950/70 border border-stone-800/80 flex items-start justify-between gap-3 hover:border-stone-700 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span className="text-xs font-bold text-white">
+                              {item.date?.substring(0, 10)}
+                            </span>
+                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                              {item.status}
+                            </span>
+                            {item.payment_status === 'paid' && (
+                              <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                Paid
+                              </span>
+                            )}
+                          </div>
+
+                          {item.items && item.items.length > 0 && (
+                            <div className="text-xs text-stone-300 mt-1.5 space-y-0.5">
+                              {item.items.map((it: any, idx: number) => (
+                                <div key={idx} className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-stone-500">•</span>
+                                  <span className="text-stone-300">{it.service_name}</span>
+                                  <span className="font-semibold text-amber-400">
+                                    × {parseFloat(it.quantity) || 0} {it.unit}
+                                  </span>
+                                  <span className="text-stone-500 text-[11px]">
+                                    = {currency}{parseFloat(it.total_price).toFixed(0)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {item.notes && (
+                            <div className="text-[11px] text-stone-500 mt-1.5 italic">
+                              Note: {item.notes}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div className="text-sm sm:text-base font-extrabold text-white">
+                            {currency}{item.total.toFixed(0)}
+                          </div>
+                          <span className="text-[10px] text-stone-500 font-semibold uppercase tracking-wider block mt-0.5">
+                            Billed
                           </span>
                         </div>
-
-                        {entry.items && (
-                          <div className="text-xs text-stone-300 mt-1 space-y-0.5">
-                            {entry.items.map((it: any, idx: number) => (
-                              <div key={idx} className="flex items-center gap-2">
-                                <span className="text-stone-400">•</span>
-                                <span>{it.service_name}</span>
-                                <span className="font-semibold text-amber-400">
-                                  × {it.quantity} {it.unit}
-                                </span>
-                                <span className="text-stone-400">
-                                  = {currency}{parseFloat(it.total_price).toFixed(0)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {entry.notes && (
-                          <div className="text-[11px] text-stone-500 mt-1 italic">
-                            Note: {entry.notes}
-                          </div>
-                        )}
                       </div>
-
-                      <div className="text-right">
-                        <div className="text-sm font-extrabold text-white">
-                          {currency}{parseFloat(entry.total_amount).toFixed(0)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -680,8 +874,6 @@ export default function CustomersPage() {
           </div>
         </div>
       )}
-
-      <BottomNav />
-    </div>
+    </>
   );
 }

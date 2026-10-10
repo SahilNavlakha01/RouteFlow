@@ -133,15 +133,41 @@ router.post('/', async (req, res) => {
       effectivePaymentStatus = 'partial';
     }
 
-    // Insert daily entry
-    const entryRes = await query(
-      `INSERT INTO daily_entries (user_id, customer_id, entry_date, total_amount, total_items, status, payment_status, paid_amount, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-      [req.user.id, customer_id, dateVal, totalAmount, totalItemsCount, status, effectivePaymentStatus, parsedPaid, notes]
+    // Check if an entry already exists for this customer on this date
+    const existingEntryRes = await query(
+      `SELECT id FROM daily_entries WHERE user_id = $1 AND customer_id = $2 AND entry_date = $3`,
+      [req.user.id, customer_id, dateVal]
     );
 
-    const newEntry = entryRes.rows[0];
+    let newEntry;
+    if (existingEntryRes.rows.length > 0) {
+      const existingId = existingEntryRes.rows[0].id;
+      const updateRes = await query(
+        `UPDATE daily_entries
+         SET total_amount = $1,
+             total_items = $2,
+             status = $3,
+             payment_status = $4,
+             paid_amount = $5,
+             notes = $6
+         WHERE id = $7 AND user_id = $8
+         RETURNING *`,
+        [totalAmount, totalItemsCount, status, effectivePaymentStatus, parsedPaid, notes, existingId, req.user.id]
+      );
+      newEntry = updateRes.rows[0];
+
+      // Clear previous items before re-inserting
+      await query('DELETE FROM daily_entry_items WHERE daily_entry_id = $1', [existingId]);
+    } else {
+      // Insert new daily entry
+      const entryRes = await query(
+        `INSERT INTO daily_entries (user_id, customer_id, entry_date, total_amount, total_items, status, payment_status, paid_amount, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING *`,
+        [req.user.id, customer_id, dateVal, totalAmount, totalItemsCount, status, effectivePaymentStatus, parsedPaid, notes]
+      );
+      newEntry = entryRes.rows[0];
+    }
 
     // Insert items
     for (const item of validatedItems) {

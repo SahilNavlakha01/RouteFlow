@@ -63,7 +63,7 @@ export default function AuthView() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-950 flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden">
+    <div className="min-h-screen bg-stone-950 flex flex-col justify-center items-center px-4 pt-16 pb-12 relative overflow-hidden">
       {/* Top Language Switcher Bar */}
       <div className="absolute top-4 right-4 z-20">
         <LanguageSwitcher />

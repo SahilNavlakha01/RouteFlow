@@ -8,6 +8,7 @@
   --emerald-fresh: #10b981;
 }
 
+html,
 body {
   background-color: #0c0a09;
   color: #f5f5f4;
@@ -15,6 +16,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
 }
 
 /* Custom Sleek Scrollbar */
@@ -55,11 +58,24 @@ body {
   box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.2);
 }
 
-/* Print Invoice styles */
+/* Print Invoice styles - Professional 1-Page Output */
+@page {
+  size: A4 portrait;
+  margin: 6mm 8mm;
+}
+
 @media print {
-  body {
-    background: white !important;
-    color: black !important;
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
   }
   .no-print {
     display: none !important;
@@ -67,12 +83,25 @@ body {
   .print-only {
     display: block !important;
   }
+  main {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
   .print-sheet {
     box-shadow: none !important;
     border: none !important;
     padding: 0 !important;
-    background: white !important;
-    color: black !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  table, tr, td, th {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
 

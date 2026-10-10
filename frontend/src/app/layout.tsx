@@ -3,11 +3,16 @@ import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
+import AppShell from '@/components/AppShell';
 
 export const metadata: Metadata = {
   title: 'RouteFlow — Smart Hyperlocal Route Ledger & Micro-ERP',
   description: 'Fast daily collection, customer ledger & WhatsApp billing for Laundry, Tiffins, Grocery & local services.',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/icon-192.png',
+    apple: '/apple-touch-icon.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -34,7 +39,7 @@ export default function RootLayout({
         <LanguageProvider>
           <AuthProvider>
             <ServiceWorkerRegister />
-            {children}
+            <AppShell>{children}</AppShell>
           </AuthProvider>
         </LanguageProvider>
       </body>
